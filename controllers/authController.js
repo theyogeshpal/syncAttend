@@ -90,8 +90,8 @@ exports.loginUser = async (req, res) => {
   try {
     const { mobile, password, deviceId } = req.body;
 
-    if (!mobile || !password || !deviceId) {
-      return res.status(400).json({ message: "All parameters (mobile, password, deviceId) are required." });
+    if (!mobile || !password) {
+      return res.status(400).json({ message: "Mobile and password are required." });
     }
 
     // Find user record
@@ -106,32 +106,32 @@ exports.loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials. Incorrect password." });
     }
 
-    // --- ANTI-PROXY DEVICE LOCK ENGINE ---
-    
-    // CASE A: Student logging in for the very first time (deviceId is null in DB)
-    if (!user.deviceId) {
-      // Rule verification: Ensure NO OTHER student has already bound this specific phone device asset ID
-      const deviceAlreadyClaimed = await User.findOne({ deviceId, role: 'student' });
-      if (deviceAlreadyClaimed) {
-        return res.status(400).json({ 
-          message: "Security Flag: Two students cannot log in using the same physical device smartphone asset." 
+    // --- ANTI-PROXY DEVICE LOCK ENGINE (Students Only) ---
+    if (user.role === 'student') {
+      // CASE A: Student logging in for the very first time (deviceId is null in DB)
+      if (!user.deviceId) {
+        // Rule verification: Ensure NO OTHER student has already bound this specific phone device asset ID
+        const deviceAlreadyClaimed = await User.findOne({ deviceId, role: 'student' });
+        if (deviceAlreadyClaimed) {
+          return res.status(400).json({ 
+            message: "Security Flag: Two students cannot log in using the same physical device smartphone asset." 
+          });
+        }
+
+        // Safe to bind this device permanently to this student account
+        user.deviceId = deviceId;
+        await user.save();
+        console.log(`🔒 Device Fingerprint successfully bound to Student: ${user.name}`);
+      } 
+      
+      // CASE B: Subsequent Logins (Compare incoming signature hardware key string against database value)
+      else if (user.deviceId !== deviceId) {
+        return res.status(403).json({ 
+          message: "Access Denied: This account is locked to your originally registered smartphone device." 
         });
       }
-
-      // Safe to bind this device permanently to this student account
-      user.deviceId = deviceId;
-      await user.save();
-      console.log(`🔒 Device Fingerprint successfully bound to Student: ${user.name}`);
-    } 
-    
-    // CASE B: Subsequent Logins (Compare incoming signature hardware key string against database value)
-    else if (user.deviceId !== deviceId) {
-      return res.status(403).json({ 
-        message: "Access Denied: This account is locked to your originally registered smartphone device." 
-      });
     }
 
-    // Login successful
     res.status(200).json({
       message: "Login verified successfully!",
       user: {

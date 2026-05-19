@@ -51,8 +51,8 @@ exports.markStudentPresence = async (req, res) => {
       return res.status(400).json({ message: "Attendance session hasn't started or has already closed." });
 
     const distance = getDistanceInMeters(batch.teacherLat, batch.teacherLng, studentLat, studentLng);
-    if (distance > 20.0)
-      return res.status(400).json({ message: `Out of bounds! You are ${Math.round(distance)}m away. Must be within 20m.` });
+    if (distance > 150.0)
+      return res.status(400).json({ message: `Out of bounds! You are ${Math.round(distance)}m away. Must be within 150m.` });
 
     const todayStr = new Date().toISOString().split('T')[0];
     const alreadyMarked = await Attendance.findOne({ studentId, batchId, date: todayStr });

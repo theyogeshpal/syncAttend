@@ -7,7 +7,7 @@ exports.registerTeacher = async (req, res) => {
     const { name, mobile, password, branch, secretKey } = req.body;
 
     // 1. Secret Key Validation (Change this to whatever master key you want)
-    const MASTER_SECRET_KEY = "DIGI_CSE_2026"; 
+    const MASTER_SECRET_KEY = "TYP_CSE_2004"; 
     if (secretKey !== MASTER_SECRET_KEY) {
       return res.status(403).json({ message: "Invalid Secret Security Key! Unauthorized access." });
     }

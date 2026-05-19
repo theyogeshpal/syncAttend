@@ -1,5 +1,6 @@
 const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
+const User = require('../models/User');
 
 // Math Engine: Haversine formula calculation to measure distance between two sets of GPS coordinates
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
@@ -109,6 +110,51 @@ exports.markStudentPresence = async (req, res) => {
     await checkInRecord.save();
     res.status(201).json({ message: "Attendance verified and successfully submitted!", checkInTime: formattedTime });
 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 4. GET ATTENDANCE RECORDS FOR A BATCH (today)
+exports.getAttendanceByBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const batch = await Batch.findById(batchId).populate('students', 'name mobile');
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
+
+    const presentRecords = await Attendance.find({ batchId, date: targetDate, status: 'Present' })
+      .populate('studentId', 'name mobile');
+
+    const presentIds = presentRecords.map(r => r.studentId._id.toString());
+
+    const present = presentRecords.map(r => ({
+      studentId: r.studentId._id,
+      name: r.studentId.name,
+      mobile: r.studentId.mobile,
+      checkInTime: r.checkInTime,
+      status: 'Present'
+    }));
+
+    const absent = batch.students
+      .filter(s => !presentIds.includes(s._id.toString()))
+      .map(s => ({ studentId: s._id, name: s.name, mobile: s.mobile, checkInTime: '--:--', status: 'Absent' }));
+
+    res.status(200).json({ batchName: batch.name, date: targetDate, present, absent });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 5. GET STUDENT ATTENDANCE HISTORY ACROSS ALL BATCHES
+exports.getStudentAttendance = async (req, res) => {
+  try {
+    const records = await Attendance.find({ studentId: req.params.studentId })
+      .populate('batchId', 'name')
+      .sort({ date: -1 });
+    res.status(200).json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

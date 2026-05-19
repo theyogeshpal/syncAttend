@@ -1,6 +1,46 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 
+// TEACHER REGISTRATION WITH SECRET KEY SECURITY
+exports.registerTeacher = async (req, res) => {
+  try {
+    const { name, mobile, password, branch, secretKey } = req.body;
+
+    // 1. Secret Key Validation (Change this to whatever master key you want)
+    const MASTER_SECRET_KEY = "DIGI_CSE_2026"; 
+    if (secretKey !== MASTER_SECRET_KEY) {
+      return res.status(403).json({ message: "Invalid Secret Security Key! Unauthorized access." });
+    }
+
+    // 2. Check if mobile number already exists
+    const userExists = await User.findOne({ mobile });
+    if (userExists) {
+      return res.status(400).json({ message: "This mobile number is already registered." });
+    }
+
+    // 3. Encrypt/Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // 4. Save to Database with 'teacher' role
+    const newTeacher = new User({
+      name,
+      mobile,
+      password: hashedPassword,
+      role: 'teacher',
+      deviceId: null, // Teachers don't need a hard locked device restriction
+      branch
+    });
+
+    await newTeacher.save();
+    res.status(201).json({ message: "Teacher account created successfully! You can now login." });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
 // 1. GLOBAL STUDENT ONBOARDING (Executed by Teachers)
 exports.onboardStudent = async (req, res) => {
   try {

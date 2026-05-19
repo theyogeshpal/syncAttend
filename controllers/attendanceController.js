@@ -2,160 +2,158 @@ const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 
-// Math Engine: Haversine formula calculation to measure distance between two sets of GPS coordinates
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Earth's radius in meters
+  const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Absolute precision distance output in meters
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// 1. TEACHER INITIATES CLASS BROADCAST
+// 1. START SESSION — stores teacher's live GPS location
 exports.startClassSession = async (req, res) => {
   try {
     const { batchId, latitude, longitude } = req.body;
-
-    if (!batchId || !latitude || !longitude) {
-      return res.status(400).json({ message: "Batch ID and location coordinates are required." });
-    }
+    if (!batchId || latitude == null || longitude == null)
+      return res.status(400).json({ message: 'batchId, latitude and longitude are required.' });
 
     const batch = await Batch.findById(batchId);
-    if (!batch) return res.status(404).json({ message: "Class batch not found." });
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
 
-    // Open the session and anchor the location coordinate center point
     batch.isClassActive = true;
     batch.teacherLat = latitude;
     batch.teacherLng = longitude;
     await batch.save();
 
-    res.status(200).json({ message: `Attendance session opened for ${batch.name}! Location anchored.` });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.status(200).json({ message: `Session started for ${batch.name}! Location anchored.` });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 2. TEACHER ENDS CLASS SESSION
+// 2. END SESSION
 exports.endClassSession = async (req, res) => {
   try {
     const { batchId } = req.body;
-
     const batch = await Batch.findById(batchId);
-    if (!batch) return res.status(404).json({ message: "Class batch not found." });
-
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
     batch.isClassActive = false;
     await batch.save();
-
-    res.status(200).json({ message: `Attendance session successfully closed for ${batch.name}.` });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.status(200).json({ message: `Session closed for ${batch.name}.` });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 3. STUDENT SUBMITS GEOFENCED ATTENDANCE MARK
+// 3. MARK STUDENT PRESENT (20m geofence)
 exports.markStudentPresence = async (req, res) => {
   try {
     const { studentId, batchId, studentLat, studentLng } = req.body;
-
-    // Validate active batch state parameters
     const batch = await Batch.findById(batchId);
-    if (!batch) return res.status(404).json({ message: "Batch not found." });
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
+    if (!batch.isClassActive)
+      return res.status(400).json({ message: "Attendance session hasn't started or has already closed." });
 
-    if (!batch.isClassActive) {
-      return res.status(400).json({ message: "Oops! The attendance session for this class has already closed or hasn't started." });
-    }
+    const distance = getDistanceInMeters(batch.teacherLat, batch.teacherLng, studentLat, studentLng);
+    if (distance > 20.0)
+      return res.status(400).json({ message: `Out of bounds! You are ${Math.round(distance)}m away. Must be within 20m.` });
 
-    // Run the Proximity Engine calculation
-    const distance = getDistanceInMeters(
-      batch.teacherLat, 
-      batch.teacherLng, 
-      studentLat, 
-      studentLng
-    );
-
-    const STRICT_LIMIT = 20.0; // The 20-meter classroom envelope requirement
-    if (distance > STRICT_LIMIT) {
-      return res.status(400).json({ 
-        message: `Verification Failed! Out of Bounds. You are ${Math.round(distance)} meters away from the teacher. You must be within 20 meters.` 
-      });
-    }
-
-    // Format current local date properties for validation logs tracking
-    const todayStr = new Date().toISOString().split('T')[0]; // Generates format "YYYY-MM-DD"
-    
-    // Check if attendance is already logged for today
+    const todayStr = new Date().toISOString().split('T')[0];
     const alreadyMarked = await Attendance.findOne({ studentId, batchId, date: todayStr });
-    if (alreadyMarked) {
-      return res.status(400).json({ message: "Attendance already captured for this session today." });
-    }
+    if (alreadyMarked)
+      return res.status(400).json({ message: 'Attendance already marked for today.' });
 
-    // Format local time stamp for roster view display tracking
-    const now = new Date();
-    const formattedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    // Success: Write Present Log Document
-    const checkInRecord = new Attendance({
-      batchId,
-      studentId,
-      date: todayStr,
-      status: 'Present',
-      checkInTime: formattedTime
-    });
-
-    await checkInRecord.save();
-    res.status(201).json({ message: "Attendance verified and successfully submitted!", checkInTime: formattedTime });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const formattedTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    await new Attendance({ batchId, studentId, date: todayStr, status: 'Present', checkInTime: formattedTime }).save();
+    res.status(201).json({ message: 'Attendance verified and recorded!', checkInTime: formattedTime });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 4. GET ATTENDANCE RECORDS FOR A BATCH (today)
+// 4. DAILY ATTENDANCE — present/absent list for a date
 exports.getAttendanceByBatch = async (req, res) => {
   try {
     const { batchId } = req.params;
-    const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
-    const batch = await Batch.findById(batchId).populate('students', 'name mobile');
+    const batch = await Batch.findById(batchId).populate('students', 'name mobile branch year');
     if (!batch) return res.status(404).json({ message: 'Batch not found.' });
 
     const presentRecords = await Attendance.find({ batchId, date: targetDate, status: 'Present' })
       .populate('studentId', 'name mobile');
 
     const presentIds = presentRecords.map(r => r.studentId._id.toString());
-
     const present = presentRecords.map(r => ({
-      studentId: r.studentId._id,
-      name: r.studentId.name,
-      mobile: r.studentId.mobile,
-      checkInTime: r.checkInTime,
-      status: 'Present'
+      studentId: r.studentId._id, name: r.studentId.name,
+      mobile: r.studentId.mobile, checkInTime: r.checkInTime, status: 'Present'
     }));
-
     const absent = batch.students
       .filter(s => !presentIds.includes(s._id.toString()))
       .map(s => ({ studentId: s._id, name: s.name, mobile: s.mobile, checkInTime: '--:--', status: 'Absent' }));
 
     res.status(200).json({ batchName: batch.name, date: targetDate, present, absent });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 5. GET STUDENT ATTENDANCE HISTORY ACROSS ALL BATCHES
+// 5. MONTHLY ATTENDANCE — full month matrix for all students in a batch
+exports.getMonthlyAttendance = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { month, year } = req.query; // month: 1-12, year: 2026
+    const now = new Date();
+    const m = parseInt(month || now.getMonth() + 1);
+    const y = parseInt(year || now.getFullYear());
+
+    const batch = await Batch.findById(batchId).populate('students', 'name mobile');
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
+
+    const startDate = `${y}-${String(m).padStart(2,'0')}-01`;
+    const endDate = `${y}-${String(m).padStart(2,'0')}-31`;
+
+    const records = await Attendance.find({
+      batchId,
+      date: { $gte: startDate, $lte: endDate }
+    }).populate('studentId', 'name mobile');
+
+    // Build matrix: { studentId: { day: status } }
+    const matrix = {};
+    for (const s of batch.students) {
+      matrix[s._id.toString()] = { name: s.name, mobile: s.mobile, days: {} };
+    }
+    for (const r of records) {
+      const sid = r.studentId._id.toString();
+      const day = parseInt(r.date.split('-')[2]);
+      if (matrix[sid]) matrix[sid].days[day] = r.status;
+    }
+
+    res.status(200).json({ batchName: batch.name, month: m, year: y, matrix: Object.entries(matrix).map(([id, v]) => ({ studentId: id, ...v })) });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
+// 6. STUDENT STATS FOR A BATCH — total %, excluding sundays & holidays
+exports.getStudentBatchStats = async (req, res) => {
+  try {
+    const { studentId, batchId } = req.params;
+    const records = await Attendance.find({ studentId, batchId }).sort({ date: 1 });
+
+    const classDays = records.filter(r => r.status === 'Present' || r.status === 'Absent');
+    const presentDays = records.filter(r => r.status === 'Present').length;
+    const totalClassDays = classDays.length;
+    const percentage = totalClassDays > 0 ? ((presentDays / totalClassDays) * 100).toFixed(1) : '0.0';
+
+    // Build monthly map for calendar grid
+    const monthlyMap = {};
+    for (const r of records) {
+      const [y, mo, d] = r.date.split('-');
+      const key = `${y}-${mo}`;
+      if (!monthlyMap[key]) monthlyMap[key] = {};
+      monthlyMap[key][parseInt(d)] = r.status;
+    }
+
+    res.status(200).json({ presentDays, totalClassDays, percentage, monthlyMap });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
+// 7. STUDENT FULL HISTORY
 exports.getStudentAttendance = async (req, res) => {
   try {
     const records = await Attendance.find({ studentId: req.params.studentId })
-      .populate('batchId', 'name')
-      .sort({ date: -1 });
+      .populate('batchId', 'name').sort({ date: -1 });
     res.status(200).json(records);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 };

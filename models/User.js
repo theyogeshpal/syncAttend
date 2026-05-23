@@ -16,8 +16,12 @@ const UserSchema = new mongoose.Schema({
   },
   role: { 
     type: String, 
-    enum: ['teacher', 'student'], 
+    enum: ['teacher', 'student', 'superadmin'], 
     required: true 
+  },
+  profilePic: {
+    type: String, // Base64 string
+    default: null
   },
   deviceId: { 
     type: String, 

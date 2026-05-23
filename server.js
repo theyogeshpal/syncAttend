@@ -24,6 +24,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/authRoutes'));
 
 app.use('/api/attendance', require('./routes/attendanceRoutes')); // Hook up our fresh attendance system routing here
+app.use('/api/admin', require('./routes/adminRoutes'));
 
 
 // Start listening for app traffic

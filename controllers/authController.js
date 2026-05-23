@@ -171,3 +171,67 @@ exports.resetStudentDevice = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// 4. CHANGE PASSWORD FUNCTIONALITY
+exports.changePassword = async (req, res) => {
+  try {
+    const { userId, oldPassword, newPassword } = req.body;
+
+    if (!userId || !oldPassword || !newPassword) {
+      return res.status(400).json({ message: "User ID, old password, and new password are required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Verify old password
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Incorrect old password." });
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+    // Save
+    user.password = hashedNewPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully!" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 5. UPLOAD PROFILE PICTURE
+exports.uploadProfilePic = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { base64Image } = req.body;
+    const user = await User.findByIdAndUpdate(userId, { profilePic: base64Image }, { new: true });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.status(200).json({ message: 'Profile picture updated successfully', profilePic: user.profilePic });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
+// 6. SEED SUPERADMIN
+exports.seedSuperadmin = async (req, res) => {
+  try {
+    const existing = await User.findOne({ role: 'superadmin' });
+    if (existing) return res.status(400).json({ message: 'Superadmin already exists' });
+    
+    const hashedPassword = await bcrypt.hash('admin', 10);
+    const superadmin = new User({
+      name: 'Super Admin',
+      mobile: '0000000000',
+      password: hashedPassword,
+      role: 'superadmin'
+    });
+    await superadmin.save();
+    res.status(201).json({ message: 'Superadmin created successfully' });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};

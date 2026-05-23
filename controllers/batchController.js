@@ -65,6 +65,32 @@ exports.deleteBatch = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
+// 6.5 ADD STUDENTS TO BATCH
+exports.addStudentsToBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { studentIds } = req.body;
+    
+    if (!studentIds || !Array.isArray(studentIds)) {
+      return res.status(400).json({ message: 'studentIds must be an array' });
+    }
+
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+
+    // Add unique students
+    const newStudents = studentIds.filter(id => !batch.students.includes(id));
+    if (newStudents.length === 0) {
+      return res.status(200).json({ message: 'All selected students are already in this batch', batch });
+    }
+
+    batch.students.push(...newStudents);
+    await batch.save();
+
+    res.status(200).json({ message: `Successfully added ${newStudents.length} students to batch.`, batch });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
 // 7. REMOVE STUDENT FROM BATCH
 exports.removeStudentFromBatch = async (req, res) => {
   try {

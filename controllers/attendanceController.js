@@ -29,60 +29,6 @@ exports.startClassSession = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// Remove a batch
-exports.deleteBatch = async (req, res) => {
-  try {
-    const { batchId } = req.params;
-    await Batch.findByIdAndDelete(batchId);
-    await Attendance.deleteMany({ batchId }); // Wipe related records
-    res.status(200).json({ message: "Batch and all related attendance records wiped." });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-};
-
-// Add students to an existing batch
-exports.addStudentsToBatch = async (req, res) => {
-  try {
-    const { batchId } = req.params;
-    const { studentIds } = req.body;
-    
-    if (!studentIds || !Array.isArray(studentIds)) {
-      return res.status(400).json({ message: 'studentIds must be an array' });
-    }
-
-    const batch = await Batch.findById(batchId);
-    if (!batch) return res.status(404).json({ message: 'Batch not found' });
-
-    // Add unique students
-    const newStudents = studentIds.filter(id => !batch.students.includes(id));
-    if (newStudents.length === 0) {
-      return res.status(200).json({ message: 'All selected students are already in this batch', batch });
-    }
-
-    batch.students.push(...newStudents);
-    await batch.save();
-
-    res.status(200).json({ message: `Successfully added ${newStudents.length} students to batch.`, batch });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-};
-
-// Remove a student from an existing batch
-exports.removeStudentFromBatch = async (req, res) => {
-  try {
-    const { batchId } = req.params;
-    const { studentId } = req.body;
-
-    if (!studentId) return res.status(400).json({ message: 'studentId is required' });
-
-    const batch = await Batch.findById(batchId);
-    if (!batch) return res.status(404).json({ message: 'Batch not found' });
-
-    batch.students = batch.students.filter(id => id.toString() !== studentId);
-    await batch.save();
-
-    res.status(200).json({ message: 'Student removed from batch.', batch });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-};
-
 // 2. END SESSION
 exports.endClassSession = async (req, res) => {
   try {

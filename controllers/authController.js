@@ -147,7 +147,8 @@ exports.loginUser = async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         branch: user.branch,
-        year: user.year
+        year: user.year,
+        profilePic: user.profilePic
       }
     });
 

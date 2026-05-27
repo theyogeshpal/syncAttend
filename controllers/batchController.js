@@ -48,7 +48,7 @@ exports.getStudentsByFilter = async (req, res) => {
 // 5. GET ALL STUDENTS (for onboard page listing)
 exports.getAllStudents = async (req, res) => {
   try {
-    const students = await User.find({ role: 'student' }).select('_id name mobile branch year session profilePic deviceId');
+    const students = await User.find({ role: 'student' }).select('_id name mobile branch year session profilePic deviceId enrollmentNumber gender dob');
     res.status(200).json(students);
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
@@ -119,11 +119,11 @@ exports.removeStudentFromBatch = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 8. UPDATE STUDENT PROFILE (name, branch, year, mobile)
+// 8. UPDATE STUDENT PROFILE (name, branch, year, mobile, enrollmentNumber, gender, dob)
 exports.updateStudentProfile = async (req, res) => {
   try {
     const { studentId } = req.params;
-    const { name, branch, year, session, mobile } = req.body;
+    const { name, branch, year, session, mobile, enrollmentNumber, gender, dob } = req.body;
     const student = await User.findById(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found.' });
     
@@ -137,7 +137,10 @@ exports.updateStudentProfile = async (req, res) => {
     if (branch) student.branch = branch;
     if (year) student.year = year;
     if (session) student.session = session;
+    if (enrollmentNumber !== undefined) student.enrollmentNumber = enrollmentNumber;
+    if (gender !== undefined) student.gender = gender;
+    if (dob !== undefined) student.dob = dob;
     await student.save();
-    res.status(200).json({ message: 'Profile updated.', student: { id: student._id, name: student.name, mobile: student.mobile, branch: student.branch, year: student.year, session: student.session } });
+    res.status(200).json({ message: 'Profile updated.', student: { id: student._id, name: student.name, mobile: student.mobile, branch: student.branch, year: student.year, session: student.session, enrollmentNumber: student.enrollmentNumber, gender: student.gender, dob: student.dob } });
   } catch (error) { res.status(500).json({ error: error.message }); }
 };

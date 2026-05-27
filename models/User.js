@@ -27,6 +27,19 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     default: null // Stays empty until the student completes their first login
   },
+  enrollmentNumber: {
+    type: String,
+    default: null
+  },
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other'],
+    default: null
+  },
+  dob: {
+    type: String,
+    default: null
+  },
   
   // Categorization parameters matching your teacher batch assignment filters
   branch: { 

@@ -18,7 +18,7 @@ exports.createBatch = async (req, res) => {
 exports.getTeacherBatches = async (req, res) => {
   try {
     const batches = await Batch.find({ teacherId: req.params.teacherId })
-      .populate('students', 'name mobile branch year session');
+      .populate('students', 'name mobile branch year session profilePic enrollmentNumber gender dob');
     res.status(200).json(batches);
   } catch (error) { res.status(500).json({ error: error.message }); }
 };

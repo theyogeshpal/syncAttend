@@ -218,6 +218,21 @@ exports.uploadProfilePic = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
+// UPDATE TEACHER PROFILE
+exports.updateTeacherProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, mobile, branch } = req.body;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (name) user.name = name;
+    if (mobile) user.mobile = mobile;
+    if (branch) user.branch = branch;
+    await user.save();
+    res.status(200).json({ message: 'Profile updated successfully', data: user });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
 // 6. SEED SUPERADMIN
 exports.seedSuperadmin = async (req, res) => {
   try {

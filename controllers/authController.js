@@ -233,20 +233,31 @@ exports.updateTeacherProfile = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 6. SEED SUPERADMIN
-exports.seedSuperadmin = async (req, res) => {
+// 6. UPDATE OR SEED SUPERADMIN WITH CUSTOM CREDENTIALS
+exports.updateSuperadmin = async (req, res) => {
   try {
-    const existing = await User.findOne({ role: 'superadmin' });
-    if (existing) return res.status(400).json({ message: 'Superadmin already exists' });
+    const { mobile, password } = req.body;
+    if (!mobile || !password) {
+      return res.status(400).json({ message: 'Mobile and password are required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let superadmin = await User.findOne({ role: 'superadmin' });
     
-    const hashedPassword = await bcrypt.hash('admin', 10);
-    const superadmin = new User({
-      name: 'Super Admin',
-      mobile: '0000000000',
-      password: hashedPassword,
-      role: 'superadmin'
-    });
-    await superadmin.save();
-    res.status(201).json({ message: 'Superadmin created successfully' });
+    if (superadmin) {
+      superadmin.mobile = mobile;
+      superadmin.password = hashedPassword;
+      await superadmin.save();
+      return res.status(200).json({ message: 'Superadmin credentials updated successfully' });
+    } else {
+      superadmin = new User({
+        name: 'Super Admin',
+        mobile: mobile,
+        password: hashedPassword,
+        role: 'superadmin'
+      });
+      await superadmin.save();
+      return res.status(201).json({ message: 'Superadmin created successfully' });
+    }
   } catch (error) { res.status(500).json({ error: error.message }); }
 };

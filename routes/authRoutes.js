@@ -12,6 +12,6 @@ router.post('/register-teacher', registerTeacher);
 router.put('/change-password', changePassword);
 router.put('/profile-pic/:userId', authController.uploadProfilePic);
 router.put('/teacher/:userId/profile', authController.updateTeacherProfile);
-router.post('/seed-superadmin', authController.seedSuperadmin);
+router.post('/update-superadmin', authController.updateSuperadmin);
 
 module.exports = router;

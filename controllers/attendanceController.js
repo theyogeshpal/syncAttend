@@ -149,23 +149,73 @@ exports.getMonthlyAttendance = async (req, res) => {
 exports.getStudentBatchStats = async (req, res) => {
   try {
     const { studentId, batchId } = req.params;
-    const records = await Attendance.find({ studentId, batchId }).sort({ date: 1 });
 
-    const classDays = records.filter(r => r.status === 'Present' || r.status === 'Absent');
-    const presentDays = records.filter(r => r.status === 'Present').length;
-    const totalClassDays = classDays.length;
-    const percentage = totalClassDays > 0 ? ((presentDays / totalClassDays) * 100).toFixed(1) : '0.0';
-
-    // Build monthly map for calendar grid
-    const monthlyMap = {};
-    for (const r of records) {
-      const [y, mo, d] = r.date.split('-');
-      const key = `${y}-${mo}`;
-      if (!monthlyMap[key]) monthlyMap[key] = {};
-      monthlyMap[key][parseInt(d)] = r.status;
+    // 1. Find the first ever attendance date for this batch
+    const firstBatchRecord = await Attendance.findOne({ batchId }).sort({ date: 1 });
+    if (!firstBatchRecord) {
+      return res.status(200).json({ presentDays: 0, totalClassDays: 0, percentage: '0.0', monthlyMap: {} });
     }
 
-    res.status(200).json({ presentDays, totalClassDays, percentage, monthlyMap });
+    const startDateStr = firstBatchRecord.date;
+    // Current local date in YYYY-MM-DD
+    const todayStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    
+    // 2. Get all distinct dates where the batch had a class
+    const batchDates = await Attendance.distinct('date', { batchId });
+    const classDaysSet = new Set(batchDates);
+
+    // 3. Get student's records
+    const studentRecords = await Attendance.find({ studentId, batchId });
+    const studentRecordMap = {};
+    studentRecords.forEach(r => studentRecordMap[r.date] = r.status);
+
+    let presentDays = 0;
+    let totalWorkingDays = 0;
+    const monthlyMap = {};
+
+    // Helper to get next day string in YYYY-MM-DD
+    const getNextDay = (dateStr) => {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    };
+
+    let currDateStr = startDateStr;
+    const endDateStr = todayStr;
+
+    while (currDateStr <= endDateStr) {
+      const d = new Date(currDateStr);
+      const isSunday = d.getDay() === 0; // 0 is Sunday
+      const hasClass = classDaysSet.has(currDateStr);
+      const studentStatus = studentRecordMap[currDateStr];
+
+      const [y, mo, dayNum] = currDateStr.split('-');
+      const key = `${y}-${mo}`;
+      if (!monthlyMap[key]) monthlyMap[key] = {};
+
+      let dayStatus;
+
+      if (isSunday) {
+        dayStatus = 'Sunday';
+      } else if (!hasClass) {
+        dayStatus = 'No Class';
+      } else {
+        totalWorkingDays++;
+        if (studentStatus === 'Present') {
+          dayStatus = 'Present';
+          presentDays++;
+        } else {
+          dayStatus = 'Absent';
+        }
+      }
+
+      monthlyMap[key][parseInt(dayNum, 10)] = dayStatus;
+      currDateStr = getNextDay(currDateStr);
+    }
+
+    const percentage = totalWorkingDays > 0 ? ((presentDays / totalWorkingDays) * 100).toFixed(1) : '0.0';
+
+    res.status(200).json({ presentDays, totalClassDays: totalWorkingDays, percentage, monthlyMap });
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 

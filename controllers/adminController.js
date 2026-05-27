@@ -27,7 +27,9 @@ exports.deleteStudent = async (req, res) => {
 
 exports.getAllBatches = async (req, res) => {
   try {
-    const batches = await Batch.find().populate('teacherId', 'name');
+    const batches = await Batch.find()
+      .populate('teacherId', 'name')
+      .populate('students', 'profilePic');
     res.status(200).json(batches);
   } catch (error) { res.status(500).json({ error: error.message }); }
 };

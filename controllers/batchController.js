@@ -48,7 +48,7 @@ exports.getStudentsByFilter = async (req, res) => {
 // 5. GET ALL STUDENTS (for onboard page listing)
 exports.getAllStudents = async (req, res) => {
   try {
-    const students = await User.find({ role: 'student' }).select('_id name mobile branch year session');
+    const students = await User.find({ role: 'student' }).select('_id name mobile branch year session profilePic deviceId');
     res.status(200).json(students);
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
@@ -119,13 +119,20 @@ exports.removeStudentFromBatch = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
-// 8. UPDATE STUDENT PROFILE (name, branch, year — not mobile)
+// 8. UPDATE STUDENT PROFILE (name, branch, year, mobile)
 exports.updateStudentProfile = async (req, res) => {
   try {
     const { studentId } = req.params;
-    const { name, branch, year, session } = req.body;
+    const { name, branch, year, session, mobile } = req.body;
     const student = await User.findById(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found.' });
+    
+    if (mobile && mobile !== student.mobile) {
+      const existing = await User.findOne({ mobile });
+      if (existing) return res.status(400).json({ message: 'Mobile number already registered to another user.' });
+      student.mobile = mobile;
+    }
+    
     if (name) student.name = name;
     if (branch) student.branch = branch;
     if (year) student.year = year;

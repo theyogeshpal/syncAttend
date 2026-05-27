@@ -1,5 +1,12 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const ImageKit = require('imagekit');
+
+const imagekit = new ImageKit({
+  publicKey: "public_RgoYoRJp5WMXFlYmZQg7rAn3pkQ=",
+  privateKey: "private_bgLQuSVui0msORiDGE9uebjsBdw=",
+  urlEndpoint: "https://ik.imagekit.io/typ1309"
+});
 
 // TEACHER REGISTRATION WITH SECRET KEY SECURITY
 exports.registerTeacher = async (req, res) => {
@@ -212,10 +219,26 @@ exports.uploadProfilePic = async (req, res) => {
   try {
     const { userId } = req.params;
     const { base64Image } = req.body;
-    const user = await User.findByIdAndUpdate(userId, { profilePic: base64Image }, { new: true });
+    
+    if (!base64Image) {
+      return res.status(400).json({ message: 'No image provided' });
+    }
+
+    const uploadRes = await imagekit.upload({
+      file: base64Image,
+      fileName: `user_${userId}_profile.jpg`,
+      folder: "/sync_attend_profiles",
+      useUniqueFileName: true
+    });
+
+    const user = await User.findByIdAndUpdate(userId, { profilePic: uploadRes.url }, { new: true });
     if (!user) return res.status(404).json({ message: 'User not found' });
+    
     res.status(200).json({ message: 'Profile picture updated successfully', profilePic: user.profilePic });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    console.error("ImageKit Upload Error:", error);
+    res.status(500).json({ error: error.message }); 
+  }
 };
 
 // UPDATE TEACHER PROFILE

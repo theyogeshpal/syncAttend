@@ -65,6 +65,22 @@ exports.deleteBatch = async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
+// 6.1 EDIT BATCH NAME
+exports.editBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ message: 'Batch name is required.' });
+    
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found.' });
+    
+    batch.name = name;
+    await batch.save();
+    res.status(200).json({ message: 'Batch name updated.', batch });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+};
+
 // 6.5 ADD STUDENTS TO BATCH
 exports.addStudentsToBatch = async (req, res) => {
   try {

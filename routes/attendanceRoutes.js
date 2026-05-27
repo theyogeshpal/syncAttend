@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { startClassSession, endClassSession, markStudentPresence, getAttendanceByBatch, getStudentAttendance, getMonthlyAttendance, getStudentBatchStats } = require('../controllers/attendanceController');
-const { createBatch, getTeacherBatches, getStudentBatches, getStudentsByFilter, deleteBatch, addStudentsToBatch, removeStudentFromBatch, getAllStudents, updateStudentProfile } = require('../controllers/batchController');
+const { createBatch, getTeacherBatches, getStudentBatches, getStudentsByFilter, deleteBatch, addStudentsToBatch, removeStudentFromBatch, getAllStudents, updateStudentProfile, editBatch } = require('../controllers/batchController');
 
 router.post('/start-session', startClassSession);
 router.post('/end-session', endClassSession);
@@ -17,6 +17,7 @@ router.get('/batch/student/:studentId', getStudentBatches);
 router.get('/batch/students/filter', getStudentsByFilter);
 router.get('/batch/students/all', getAllStudents);
 router.delete('/batch/:batchId', deleteBatch);
+router.put('/batch/:batchId', editBatch);
 router.put('/batch/:batchId/add-students', addStudentsToBatch);
 router.delete('/batch/:batchId/student/:studentId', removeStudentFromBatch);
 router.put('/student/:studentId/profile', updateStudentProfile);

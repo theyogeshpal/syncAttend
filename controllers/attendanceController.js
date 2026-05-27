@@ -37,7 +37,27 @@ exports.endClassSession = async (req, res) => {
     if (!batch) return res.status(404).json({ message: 'Batch not found.' });
     batch.isClassActive = false;
     await batch.save();
-    res.status(200).json({ message: `Session closed for ${batch.name}.` });
+
+    // Generate absent records for students who didn't mark present today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const presentRecords = await Attendance.find({ batchId, date: todayStr });
+    const presentIds = presentRecords.map(r => r.studentId.toString());
+
+    const absentStudents = batch.students.filter(sId => !presentIds.includes(sId.toString()));
+    for (let sId of absentStudents) {
+      const existing = await Attendance.findOne({ batchId, studentId: sId, date: todayStr });
+      if (!existing) {
+        await new Attendance({
+          batchId,
+          studentId: sId,
+          date: todayStr,
+          status: 'Absent',
+          checkInTime: '--:--'
+        }).save();
+      }
+    }
+
+    res.status(200).json({ message: `Session closed for ${batch.name}. Absent records generated.` });
   } catch (error) { res.status(500).json({ error: error.message }); }
 };
 
